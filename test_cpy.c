@@ -3,26 +3,13 @@
 #include <string.h>
 #include <time.h>
 
+#include "bench.h"
 #include "tst.h"
 
 /** constants insert, delete, max word(s) & stack nodes */
 enum { INS, DEL, WRDMAX = 256, STKMAX = 512, LMAX = 1024 };
 #define REF INS
 #define CPY DEL
-
-/* timing helper function */
-static double tvgetf(void)
-{
-    struct timespec ts;
-    double sec;
-
-    clock_gettime(CLOCK_REALTIME, &ts);
-    sec = ts.tv_nsec;
-    sec /= 1e9;
-    sec += ts.tv_sec;
-
-    return sec;
-}
 
 /* simple trim '\n' from end of buffer filled by fgets */
 static void rmcrlf(char *s)
@@ -33,6 +20,8 @@ static void rmcrlf(char *s)
 }
 
 #define IN_FILE "cities.txt"
+#define BENCH_TEST_FILE "bench_cpy.txt"
+#define PREF_TEST_FILE "pref_cpy.txt"
 
 int main(int argc, char **argv)
 {
@@ -42,6 +31,15 @@ int main(int argc, char **argv)
     int rtn = 0, idx = 0, sidx = 0;
     FILE *fp = fopen(IN_FILE, "r");
     double t1, t2;
+    int bench_flag = 0;
+
+    if (argc > 1) {
+        if ( (strcmp(argv[1],"--bench") == 0 )|| (strcmp(argv[1], "--BENCH") == 0) ) {
+            bench_flag = 1;
+        } else {
+            bench_flag = 0;
+        }
+    }
 
     if (!fp) { /* prompt, open, validate file for reading */
         fprintf(stderr, "error: file open failed '%s'.\n", argv[1]);
@@ -63,6 +61,13 @@ int main(int argc, char **argv)
     fclose(fp);
     printf("ternary_tree, loaded %d words in %.6f sec\n", idx, t2 - t1);
 
+    //tst_traverse_fn(root, print_word, word);
+    if (argc == 2 && strcmp(argv[1], "--bench") == 0) {
+        int stat = bench_test(root, BENCH_TEST_FILE, LMAX, t2-t1,1);
+        tst_free_all(root);
+        return stat ;
+    }
+
     for (;;) {
         char *p;
         printf(
@@ -73,7 +78,14 @@ int main(int argc, char **argv)
             " d  delete word from the tree\n"
             " q  quit, freeing all data\n\n"
             "choice: ");
-        fgets(word, sizeof word, stdin);
+        /*If bench_flag is set, let the 'word' always be 'argv[1]'*/
+        if (bench_flag == 1) {
+            strcpy(word, argv[2]);
+        } else if (bench_flag == 2) {
+            strcpy(word, "q");
+        } else {
+            fgets(word, sizeof word, stdin);
+        }
         p = NULL;
         switch (*word) {
         case 'a':
@@ -89,8 +101,7 @@ int main(int argc, char **argv)
             t2 = tvgetf();
             if (res) {
                 idx++;
-                printf("  %s - inserted in %.6f sec. (%d words in tree)\n",
-                       (char *) res, t2 - t1, idx);
+                printf("  %s - inserted in %.6f sec. (%d words in tree)\n",(char *) res, t2 - t1, idx);
             } else
                 printf("  %s - already exists in list.\n", (char *) res);
             break;
@@ -111,20 +122,30 @@ int main(int argc, char **argv)
             break;
         case 's':
             printf("find words matching prefix (at least 1 char): ");
-            if (!fgets(word, sizeof word, stdin)) {
-                fprintf(stderr, "error: insufficient input.\n");
-                break;
+            if (bench_flag == 1) {
+                strcpy(word, argv[3]);
+            } else {
+                if (!fgets(word, sizeof word, stdin)) {
+                    fprintf(stderr, "error: insufficient input.\n");
+                    break;
+                }
             }
             rmcrlf(word);
             t1 = tvgetf();
             res = tst_search_prefix(root, word, sgl, &sidx, LMAX);
             t2 = tvgetf();
             if (res) {
-                printf("  %s - searched prefix in %.6f sec\n\n", word, t2 - t1);
-                for (int i = 0; i < sidx; i++)
+                for (int i = 0; i < sidx; i++) {
                     printf("suggest[%d] : %s\n", i, sgl[i]);
+                }
+                printf("  %s - searched prefix in %.6f sec\n\n", word, t2 - t1);
+                bench_test(root, PREF_TEST_FILE, LMAX, t2-t1,0);
             } else
                 printf("  %s - not found\n", word);
+
+            if (bench_flag == 1) {
+                bench_flag = 2;
+            }
             break;
         case 'd':
             printf("enter word to del: ");

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "bench.h"
 
 #include "tst.h"
 
@@ -9,20 +10,6 @@
 enum { INS, DEL, WRDMAX = 256, STKMAX = 512, LMAX = 1024 };
 #define REF INS
 #define CPY DEL
-
-/* timing helper function */
-static double tvgetf(void)
-{
-    struct timespec ts;
-    double sec;
-
-    clock_gettime(CLOCK_REALTIME, &ts);
-    sec = ts.tv_nsec;
-    sec /= 1e9;
-    sec += ts.tv_sec;
-
-    return sec;
-}
 
 /* simple trim '\n' from end of buffer filled by fgets */
 static void rmcrlf(char *s)
@@ -33,6 +20,8 @@ static void rmcrlf(char *s)
 }
 
 #define IN_FILE "cities.txt"
+#define BENCH_TEST_FILE "bench_ref.txt"
+#define PERF_TEST_FILE "pref_ref.txt"
 
 int main(int argc, char **argv)
 {
@@ -42,6 +31,15 @@ int main(int argc, char **argv)
     int rtn = 0, idx = 0, sidx = 0;
     FILE *fp = fopen(IN_FILE, "r");
     double t1, t2;
+    int bench_flag = 0;
+
+    if (argc > 1) {
+        if ((strcmp(argv[1],"--bench") == 0 ) || (strcmp(argv[1], "--BENCH") == 0)) {
+            bench_flag =   1;
+        } else {
+            bench_flag =   0;
+        }
+    }
 
     if (!fp) { /* prompt, open, validate file for reading */
         fprintf(stderr, "error: file open failed '%s'.\n", argv[1]);
@@ -50,9 +48,9 @@ int main(int argc, char **argv)
 
     t1 = tvgetf();
     while ((rtn = fscanf(fp, "%s", word)) != EOF) {
-        char *p = word;
+        char *p = strdup(word);
         /* FIXME: insert reference to each string */
-        if (!tst_ins_del(&root, &p, INS, CPY)) {
+        if (!tst_ins_del(&root, &p, INS, REF)) {
             fprintf(stderr, "error: memory exhausted, tst_insert.\n");
             fclose(fp);
             return 1;
@@ -64,6 +62,12 @@ int main(int argc, char **argv)
     fclose(fp);
     printf("ternary_tree, loaded %d words in %.6f sec\n", idx, t2 - t1);
 
+    if (argc == 2 && strcmp(argv[1], "--bench") == 0) {
+        int stat = bench_test(root,BENCH_TEST_FILE, LMAX,t2-t1,1);
+        tst_free(root);
+        return stat;
+    }
+
     for (;;) {
         char *p;
         printf(
@@ -74,7 +78,13 @@ int main(int argc, char **argv)
             " d  delete word from the tree\n"
             " q  quit, freeing all data\n\n"
             "choice: ");
-        fgets(word, sizeof word, stdin);
+        if (bench_flag == 1) {
+            strcpy(word, argv[2]);
+        } else if (bench_flag == 2) {
+            strcpy(word, "q");
+        } else {
+            fgets(word, sizeof word, stdin);
+        }
         p = NULL;
         switch (*word) {
         case 'a':
@@ -84,10 +94,10 @@ int main(int argc, char **argv)
                 break;
             }
             rmcrlf(word);
-            p = word;
+            p = strdup(word);
             t1 = tvgetf();
             /* FIXME: insert reference to each string */
-            res = tst_ins_del(&root, &p, INS, CPY);
+            res = tst_ins_del(&root, &p, INS, REF);
             t2 = tvgetf();
             if (res) {
                 idx++;
@@ -113,20 +123,29 @@ int main(int argc, char **argv)
             break;
         case 's':
             printf("find words matching prefix (at least 1 char): ");
-            if (!fgets(word, sizeof word, stdin)) {
-                fprintf(stderr, "error: insufficient input.\n");
-                break;
+            if (bench_flag == 1) {
+                strcpy(word, argv[3]);
+            } else {
+                if (!fgets(word, sizeof word, stdin)) {
+                    fprintf(stderr, "error: insufficient input.\n");
+                    break;
+                }
             }
             rmcrlf(word);
             t1 = tvgetf();
             res = tst_search_prefix(root, word, sgl, &sidx, LMAX);
             t2 = tvgetf();
             if (res) {
-                printf("  %s - searched prefix in %.6f sec\n\n", word, t2 - t1);
                 for (int i = 0; i < sidx; i++)
                     printf("suggest[%d] : %s\n", i, sgl[i]);
+                printf("  %s - searched prefix in %.6f sec\n\n", word, t2 - t1);
+                bench_test(root, PERF_TEST_FILE, LMAX, t2-t1,0);
             } else
                 printf("  %s - not found\n", word);
+
+            if (bench_flag == 1) {
+                bench_flag = 2;
+            }
             break;
         case 'd':
             printf("enter word to del: ");
@@ -135,11 +154,11 @@ int main(int argc, char **argv)
                 break;
             }
             rmcrlf(word);
-            p = word;
+            p = strdup(word);
             printf("  deleting %s\n", word);
             t1 = tvgetf();
             /* FIXME: remove reference to each string */
-            res = tst_ins_del(&root, &p, DEL, CPY);
+            res = tst_ins_del(&root, &p, DEL, REF);
             t2 = tvgetf();
             if (res)
                 printf("  delete failed.\n");
@@ -149,7 +168,7 @@ int main(int argc, char **argv)
             }
             break;
         case 'q':
-            tst_free_all(root);
+            tst_free(root);//change tst_free_all to tst_free
             return 0;
             break;
         default:
