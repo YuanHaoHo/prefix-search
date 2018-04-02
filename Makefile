@@ -38,7 +38,6 @@ OBJS_LIB = \
 
 CAL = \
     calculate_pref \
-    calculate_bench
 
 OBJS := \
     $(OBJS_LIB) \
@@ -81,9 +80,7 @@ bench: $(BEN)
 	./test_ref --bench;
 
 calculate: $(CAL)
-	$(CC) -c $^ -o $@ \
-	./calculate_bench \
-	./calculate_pref
+	$(CC) -c $^ -o $@  & ./calculate_pref 
 
 plot: 
 	gnuplot scripts/runtime.gp

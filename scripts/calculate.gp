@@ -3,9 +3,9 @@ set ylabel 'cycle'
 set xlabel 'time(sec)'
 set title 'perfomance comparison'
 set term png enhanced font 'Verdana,10'
-set output 'searchtime_bench.png'
+set output 'searchtime_perf.png'
 set format x "%0.9f"
-set xtic 0.00001
+set xtic 0.0001
 set xtics rotate by 45 right
 
 plot [:][:80]'calculate_pref.txt' using 1:2 with points title 'ref',\

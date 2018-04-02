@@ -21,15 +21,15 @@ int main(void)
 
     if (!fp_cpy || !fp_ref || !dict) {
         if (fp_cpy) {
-            printf(fp_cpy, "error: file open failed in '%s'.\n", FILE_CAL_CPY);
+            printf( "error: file open failed in '%s'.\n", FILE_CAL_CPY);
             fclose(fp_cpy);
         }
         if (fp_ref) {
-            printf(fp_ref, "error: file open failed in '%s'.\n", FILE_CAL_REF);
+            printf( "error: file open failed in '%s'.\n", FILE_CAL_REF);
             fclose(fp_ref);
         }
         if (dict) {
-            fprintf(dict, "error: file open failed in '%s'.\n","calculate_pref..txt");
+            printf( "error: file open failed in '%s'.\n","calculate_pref..txt");
             fclose(dict);
         }
         return 1;
